@@ -1,0 +1,16 @@
+{
+  "name": "Unraid Control PWA",
+  "short_name": "Unraid PWA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#120f1a",
+  "theme_color": "#1f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

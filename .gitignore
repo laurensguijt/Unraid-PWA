@@ -1,0 +1,31 @@
+# Dependencies
+node_modules
+
+# Build output
+dist
+frontend/dist
+backend/dist
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Runtime data (never commit)
+backend/data/*
+!backend/data/.gitkeep
+
+# IDE and OS
+.DS_Store
+*.swp
+*.swo
+.idea
+.vscode/settings.json
+
+# Test and E2E
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/
+*.log
+npm-debug.log*

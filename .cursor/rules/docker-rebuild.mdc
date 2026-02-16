@@ -1,0 +1,16 @@
+---
+description: Rebuild and restart Docker after frontend/backend changes
+alwaysApply: true
+---
+
+# Docker rebuild after code changes
+
+When you change files that affect the running app (e.g. `frontend/src/**`, `frontend/public/**`, `backend/src/**`, or root `Dockerfile` / `docker-compose.yml`), **rebuild and restart the container** so the user sees the update when using the app via Docker (e.g. http://localhost:8080).
+
+Run from the **project root**:
+
+```bash
+docker compose build && docker compose up -d
+```
+
+Do this in the same turn as the edit when the change is meant to be visible in the Docker-served app. Use a timeout of at least 120000 ms and request `full_network` and `all` permissions for the command.

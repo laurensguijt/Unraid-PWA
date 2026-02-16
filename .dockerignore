@@ -1,0 +1,34 @@
+# Dependencies and build artifacts (rebuilt in container)
+node_modules
+**/node_modules
+**/dist
+frontend/dist
+backend/dist
+
+# Git and env (not needed in image)
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+# Runtime data (mounted as volume in production)
+backend/data
+
+# Docs and dev (optional, keeps image smaller)
+docs
+*.md
+!README.md
+
+# Tests and IDE
+**/e2e
+**/*.spec.ts
+**/*.test.ts
+**/test-results
+**/playwright-report
+.cursor
+.idea
+.vscode
+
+# OS
+.DS_Store
