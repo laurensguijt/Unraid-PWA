@@ -67,7 +67,7 @@ Back up the `backend/data` folder.
 Available variables (see `.env.example`):
 
 - `UNRAID_BFF_PORT` (default `3001`, mapped to host port `2442` in `docker-compose.yml`)
-- `UNRAID_BFF_ORIGIN` (CORS allowlist)
+- `UNRAID_BFF_ORIGIN` (CORS allowlist for cross-origin `/api` requests; same-origin usage on `http://<UNRAID-IP>:2442` does not need this)
 - `UNRAID_BFF_ENCRYPTION_KEY` (optional override; if empty, app auto-generates and persists `backend/data/encryption.key`)
 - `UNRAID_BFF_ALLOW_SELF_SIGNED` (`true`/`false`)
 - `UNRAID_BFF_TRUST_PROXY` (`false`, `true`, or proxy mode)

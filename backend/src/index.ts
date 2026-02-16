@@ -14,7 +14,8 @@ const allowedOrigins = (process.env.UNRAID_BFF_ORIGIN ?? "*")
   .split(",")
   .map((item) => item.trim())
   .filter(Boolean);
-const allowAnyOrigin = allowedOrigins.includes("*");
+const normalizedAllowedOrigins = new Set(allowedOrigins.map((origin) => origin.toLowerCase()));
+const allowAnyOrigin = normalizedAllowedOrigins.has("*");
 const trustProxyRaw = (process.env.UNRAID_BFF_TRUST_PROXY ?? "false").trim().toLowerCase();
 if (trustProxyRaw === "true") {
   app.set("trust proxy", 1);
@@ -22,17 +23,48 @@ if (trustProxyRaw === "true") {
   app.set("trust proxy", trustProxyRaw);
 }
 
+function getRequestHost(req: Request): string {
+  const header = req.header("x-forwarded-host") ?? req.header("host") ?? "";
+  return header.split(",")[0]?.trim().toLowerCase() ?? "";
+}
+
+function isSameOrigin(origin: string, req: Request): boolean {
+  if (!origin) {
+    return false;
+  }
+  try {
+    const parsedOrigin = new URL(origin);
+    const requestHost = getRequestHost(req);
+    if (!requestHost) {
+      return false;
+    }
+    return parsedOrigin.host.toLowerCase() === requestHost;
+  } catch {
+    return false;
+  }
+}
+
 app.disable("x-powered-by");
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || allowAnyOrigin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error("Origin not allowed by CORS"));
-    },
-    credentials: true,
+  "/api",
+  cors<Request>((req, callback) => {
+    const origin = req.header("origin");
+    if (!origin) {
+      callback(null, { origin: false });
+      return;
+    }
+
+    const normalizedOrigin = origin.toLowerCase();
+    if (
+      allowAnyOrigin ||
+      normalizedAllowedOrigins.has(normalizedOrigin) ||
+      isSameOrigin(origin, req)
+    ) {
+      callback(null, { origin: true, credentials: true });
+      return;
+    }
+
+    callback(new Error("Origin not allowed by CORS"));
   }),
 );
 app.use(cookieParser());
