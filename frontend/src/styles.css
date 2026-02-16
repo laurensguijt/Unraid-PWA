@@ -4,21 +4,34 @@
   background: #09090f;
   text-rendering: optimizeLegibility;
   --accent-rgb: 234, 88, 12;
+  --safe-top: min(env(safe-area-inset-top, 0px), 64px);
+  --safe-right: min(env(safe-area-inset-right, 0px), 28px);
+  --safe-bottom: min(env(safe-area-inset-bottom, 0px), 48px);
+  --safe-left: min(env(safe-area-inset-left, 0px), 28px);
+  --tabbar-bottom-offset: clamp(0.45rem, calc(var(--safe-bottom) * 0.34), 0.95rem);
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
   min-height: 100vh;
+  min-height: 100dvh;
+  background: #090912;
 }
 
 .app {
   position: relative;
+  isolation: isolate;
   min-height: 100vh;
-  padding: 1.15rem;
+  min-height: 100dvh;
+  padding-top: calc(var(--safe-top) + 1.15rem);
+  padding-right: calc(var(--safe-right) + 1.15rem);
+  padding-bottom: calc(var(--safe-bottom) + 1.15rem);
+  padding-left: calc(var(--safe-left) + 1.15rem);
   color: #f8fafc;
 }
 
@@ -45,7 +58,8 @@ body {
 .gradient {
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
+  pointer-events: none;
   background:
     radial-gradient(circle at 10% 8%, rgba(var(--accent-rgb), 0.26), transparent 42%),
     radial-gradient(circle at 78% 0%, #7c3aed57, transparent 34%),
@@ -66,9 +80,11 @@ body {
 }
 
 .panel {
+  position: relative;
+  z-index: 1;
   margin: 0 auto;
   max-width: 470px;
-  padding-bottom: 6.4rem;
+  padding-bottom: calc(6.4rem + var(--safe-bottom));
 }
 
 .header {
@@ -692,7 +708,7 @@ button:disabled {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: 1rem;
+  bottom: var(--tabbar-bottom-offset);
   display: flex;
   gap: 0.35rem;
   padding: 0.42rem;
@@ -838,7 +854,10 @@ select {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 1rem 1rem 6.2rem;
+  padding-top: calc(var(--safe-top) + 1.6rem);
+  padding-right: calc(var(--safe-right) + 1rem);
+  padding-bottom: calc(var(--safe-bottom) + 6.2rem);
+  padding-left: calc(var(--safe-left) + 1rem);
   z-index: 1200;
 }
 
@@ -851,11 +870,71 @@ select {
   box-shadow: 0 24px 50px #00000075;
 }
 
+.dialog--closable {
+  position: relative;
+}
+
+.dialog--closable > .row:first-of-type,
+.dialog--closable > .dialog-header,
+.dialog--closable .docker-dialog-header,
+.dialog--closable > h3 {
+  padding-right: 2.6rem;
+}
+
+.dialog-header {
+  margin-bottom: 0.58rem;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.dialog-subtitle {
+  margin: 0;
+  color: #cbd5e1d6;
+  line-height: 1.35;
+}
+
+.dialog-header--split {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.dialog-header-main {
+  min-width: 0;
+}
+
+button.dialog-close-icon {
+  position: absolute;
+  top: 0.72rem;
+  right: 0.72rem;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid #ffffff36;
+  background: #ffffff1a;
+  color: #f8fafc;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+button.dialog-close-icon:hover {
+  background: #ffffff25;
+}
+
 .app.theme-light .circle-button,
 .app.theme-light .icon-button,
 .app.theme-light .notification-archive {
   border-color: #33415542;
   background: #ffffffbf;
+  color: #0f172a;
+}
+
+.app.theme-light button.dialog-close-icon {
+  border-color: #33415545;
+  background: #ffffffcf;
   color: #0f172a;
 }
 
@@ -882,13 +961,14 @@ select {
 
 .docker-dialog-header .docker-card-actions {
   align-items: center;
+  align-self: flex-start;
 }
 
 .docker-dialog-header .pill {
-  min-height: 36px;
+  min-height: 32px;
   line-height: 1.05;
-  padding-top: 0.2rem;
-  padding-bottom: 0.2rem;
+  padding-top: 0.14rem;
+  padding-bottom: 0.14rem;
   max-width: none;
   flex-shrink: 0;
   overflow: visible;
@@ -898,15 +978,6 @@ select {
 
 .docker-dialog-header .pill svg {
   display: block;
-}
-
-.dialog-close-button {
-  min-height: 36px;
-  padding: 0.45rem 0.78rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
 }
 
 .docker-dialog-title {
@@ -922,10 +993,14 @@ select {
 .docker-dialog-image {
   margin-top: 0.2rem;
   display: block;
-  color: #cbd5e1d6;
+  color: #cbd5e1cc;
   overflow-wrap: anywhere;
-  word-break: break-all;
+  word-break: break-word;
   font-size: 0.8em;
+}
+
+.dialog-meta {
+  line-height: 1.3;
 }
 
 .docker-detail-grid {

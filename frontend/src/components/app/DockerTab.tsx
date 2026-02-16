@@ -1,4 +1,4 @@
-import { Activity, CircleX, Info, Plus } from "lucide-react";
+import { Activity, CircleX, Info } from "lucide-react";
 import { dockerIconProxyUrl } from "../../lib/ui";
 import type { DockerData } from "../../types";
 import { FrostedCard } from "../FrostedCard";
@@ -36,7 +36,6 @@ export function DockerTab({
         </label>
         <IconRow label="Running" value={`${docker?.summary.running ?? 0}`} icon={Activity} />
         <IconRow label="Stopped" value={`${docker?.summary.stopped ?? 0}`} icon={CircleX} />
-        <IconRow label="Updates" value={`${docker?.summary.updatesAvailable ?? 0}`} icon={Plus} />
       </FrostedCard>
       {filteredContainers.map((container) => (
         <FrostedCard key={container.id}>
@@ -63,12 +62,6 @@ export function DockerTab({
             </div>
           </div>
           <small>{container.image}</small>
-          {(container.updateAvailable || container.rebuildReady) && (
-            <small>
-              Update status: {container.updateAvailable ? "update available" : "up to date"}
-              {container.rebuildReady ? " (rebuild ready)" : ""}
-            </small>
-          )}
         </FrostedCard>
       ))}
     </>

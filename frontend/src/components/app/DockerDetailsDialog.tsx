@@ -1,4 +1,4 @@
-import { LayoutGrid, Network } from "lucide-react";
+import { LayoutGrid, Network, X } from "lucide-react";
 import { dockerIconProxyUrl, resolveDockerWebUiUrl } from "../../lib/ui";
 import type { DockerAction, DockerData } from "../../types";
 import { DockerLogo } from "../DockerLogo";
@@ -33,9 +33,18 @@ export function DockerDetailsDialog({
       aria-label="Docker details"
       onClick={onClose}
     >
-      <div className="dialog settings-dialog docker-dialog" onClick={(event) => event.stopPropagation()}>
-        <div className="row docker-dialog-header">
-          <div className="docker-title">
+      <div className="dialog settings-dialog docker-dialog dialog--closable" onClick={(event) => event.stopPropagation()}>
+        <button
+          className="dialog-close-icon"
+          type="button"
+          onClick={onClose}
+          aria-label="Close docker details dialog"
+          title="Close"
+        >
+          <X size={16} />
+        </button>
+        <div className="row docker-dialog-header dialog-header--split">
+          <div className="docker-title dialog-header-main">
             <DockerLogo
               name={container.name}
               iconUrl={container.iconUrl}
@@ -43,14 +52,11 @@ export function DockerDetailsDialog({
             />
             <div className="docker-dialog-title">
               <h3>{container.name}</h3>
-              <small className="docker-dialog-image">{container.image}</small>
+              <small className="docker-dialog-image dialog-meta">{container.image}</small>
             </div>
           </div>
           <div className="docker-card-actions">
             <StatusPill status={container.status} />
-            <button className="secondary dialog-close-button" type="button" onClick={onClose}>
-              Close
-            </button>
           </div>
         </div>
 

@@ -48,9 +48,11 @@ export function OverviewTab({
         <IconRow label="Memory" value={`${overview.memoryPercent}%`} icon={MemoryStick} />
         <ProgressBar value={overview.memoryPercent} />
         <small>
-          {overview.memoryUsed} / {overview.memoryTotal}
+          {overview.memoryUsed} / {overview.memoryTotal} Used (apps)
         </small>
-        <small>Free: {overview.memoryFree}</small>
+        <small>
+          Available: {overview.memoryAvailable} | Cache: {overview.memoryCache} | Free: {overview.memoryFree}
+        </small>
       </FrostedCard>
 
       <FrostedCard>

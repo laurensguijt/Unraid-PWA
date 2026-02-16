@@ -1,3 +1,4 @@
+import { X } from "lucide-react";
 import { vmActionLabel, vmActionsForState } from "../../lib/ui";
 import type { VmAction, VmsData } from "../../types";
 import { StatusPill } from "../StatusPill";
@@ -12,6 +13,9 @@ type VmDetailsDialogProps = {
 };
 
 export function VmDetailsDialog({ vm, canWriteControls, onClose, onRequestAction }: VmDetailsDialogProps) {
+  const compactVmId =
+    vm.id.length > 36 ? `${vm.id.slice(0, 18)}...${vm.id.slice(-12)}` : vm.id;
+
   return (
     <div
       className="dialog-backdrop"
@@ -20,17 +24,25 @@ export function VmDetailsDialog({ vm, canWriteControls, onClose, onRequestAction
       aria-label="VM details"
       onClick={onClose}
     >
-      <div className="dialog settings-dialog docker-dialog" onClick={(event) => event.stopPropagation()}>
-        <div className="row docker-dialog-header">
-          <div className="docker-dialog-title">
+      <div className="dialog settings-dialog docker-dialog dialog--closable" onClick={(event) => event.stopPropagation()}>
+        <button
+          className="dialog-close-icon"
+          type="button"
+          onClick={onClose}
+          aria-label="Close VM details dialog"
+          title="Close"
+        >
+          <X size={16} />
+        </button>
+        <div className="row docker-dialog-header dialog-header--split">
+          <div className="docker-dialog-title dialog-header-main">
             <h3>{vm.name}</h3>
-            <small className="docker-dialog-image">{vm.id}</small>
+            <small className="docker-dialog-image dialog-meta" title={vm.id}>
+              {compactVmId}
+            </small>
           </div>
           <div className="docker-card-actions">
             <StatusPill status={vm.status} />
-            <button className="secondary dialog-close-button" type="button" onClick={onClose}>
-              Close
-            </button>
           </div>
         </div>
 

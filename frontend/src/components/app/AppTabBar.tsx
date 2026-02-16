@@ -28,7 +28,7 @@ export function AppTabBar({ tab, onChange }: AppTabBarProps) {
       {TABS.map((item) => (
         <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => onChange(item.id)}>
           <span className="tab-icon">
-            <item.icon size={14} />
+            <item.icon size={16} />
           </span>
           <span className="tab-label">{TAB_LABELS[item.id]}</span>
         </button>

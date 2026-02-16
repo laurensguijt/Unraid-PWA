@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import type { ServerRecord } from "../../types";
 import { BadgePill } from "../BadgePill";
 import { FrostedCard } from "../FrostedCard";
@@ -62,14 +62,20 @@ export function SettingsDialog({
       aria-label="Settings"
       onClick={onClose}
     >
-      <div className="dialog settings-dialog" onClick={(event) => event.stopPropagation()}>
-        <div className="row">
+      <div className="dialog settings-dialog dialog--closable" onClick={(event) => event.stopPropagation()}>
+        <button
+          className="dialog-close-icon"
+          type="button"
+          onClick={onClose}
+          aria-label="Close settings dialog"
+          title="Close"
+        >
+          <X size={16} />
+        </button>
+        <div className="dialog-header">
           <h3>Settings</h3>
-          <button className="secondary" type="button" onClick={onClose}>
-            Close
-          </button>
+          <p className="dialog-subtitle">Manage servers and app preferences.</p>
         </div>
-        <small>Manage servers and app preferences.</small>
 
         <FrostedCard>
           <SectionHeader title="Server management" right={<BadgePill value={servers.length} />} />

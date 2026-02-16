@@ -16,6 +16,8 @@ export type OverviewResponse = {
   memoryPercent: number;
   memoryUsed: string;
   memoryTotal: string;
+  memoryAvailable: string;
+  memoryCache: string;
   memoryFree: string;
   serverName: string;
   licenseType: string;
@@ -110,7 +112,7 @@ export type ArrayResponse = {
 };
 
 export type DockerResponse = {
-  summary: { running: number; stopped: number; updatesAvailable: number };
+  summary: { running: number; stopped: number };
   containers: Array<{
     id: string;
     name: string;
@@ -121,8 +123,6 @@ export type DockerResponse = {
     ports: string;
     createdAt: string;
     autoStart: boolean;
-    updateAvailable: boolean;
-    rebuildReady: boolean;
     stateLabel: string;
     status: "running" | "stopped" | "unknown";
   }>;

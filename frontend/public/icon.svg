@@ -1,13 +1,38 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
+    <linearGradient id="bgBase" x1="68" y1="36" x2="444" y2="484" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3b1210"/>
+      <stop offset="0.46" stop-color="#31144a"/>
+      <stop offset="1" stop-color="#0b1534"/>
+    </linearGradient>
+    <radialGradient id="bgWarm" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(106 76) rotate(47) scale(328 276)">
+      <stop offset="0" stop-color="#f97316" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#f97316" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bgCool" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(410 438) rotate(236) scale(356 304)">
+      <stop offset="0" stop-color="#3b82f6" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#3b82f6" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="glassPanel" x1="78" y1="74" x2="430" y2="432" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff22"/>
+      <stop offset="0.38" stop-color="#ffffff16"/>
+      <stop offset="1" stop-color="#ffffff0c"/>
+    </linearGradient>
+    <linearGradient id="glassStroke" x1="94" y1="66" x2="418" y2="446" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff5c"/>
+      <stop offset="1" stop-color="#ffffff2b"/>
+    </linearGradient>
     <linearGradient id="u" x1="188" y1="132" x2="324" y2="304" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#f59e0b"/>
       <stop offset="1" stop-color="#ea580c"/>
     </linearGradient>
   </defs>
 
-  <rect width="512" height="512" rx="112" fill="#0b111d"/>
-  <rect x="66" y="66" width="380" height="380" rx="98" fill="#0f172a" stroke="#ffffff2b" stroke-width="2"/>
+  <rect width="512" height="512" rx="112" fill="url(#bgBase)"/>
+  <rect width="512" height="512" rx="112" fill="url(#bgWarm)"/>
+  <rect width="512" height="512" rx="112" fill="url(#bgCool)"/>
+  <rect x="66" y="66" width="380" height="380" rx="98" fill="url(#glassPanel)" stroke="url(#glassStroke)" stroke-width="2.5"/>
+  <path d="M90 122c34-34 92-52 170-52s134 16 162 42v64H90z" fill="#ffffff12"/>
 
   <path d="M192 144v88c0 35 29 64 64 64s64-29 64-64v-88" stroke="url(#u)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
 

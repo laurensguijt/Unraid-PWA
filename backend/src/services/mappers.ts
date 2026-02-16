@@ -143,7 +143,14 @@ export function mapOverview(data: unknown): OverviewResponse {
       };
       metrics?: {
         cpu?: { percentTotal?: unknown };
-        memory?: { percentTotal?: unknown; used?: unknown; total?: unknown; free?: unknown };
+        memory?: {
+          percentTotal?: unknown;
+          used?: unknown;
+          total?: unknown;
+          free?: unknown;
+          available?: unknown;
+          buffcache?: unknown;
+        };
       };
       array?: {
         state?: unknown;
@@ -202,7 +209,14 @@ export function mapOverview(data: unknown): OverviewResponse {
     };
     metrics?: {
       cpu?: { percentTotal?: unknown };
-      memory?: { percentTotal?: unknown; used?: unknown; total?: unknown; free?: unknown };
+      memory?: {
+        percentTotal?: unknown;
+        used?: unknown;
+        total?: unknown;
+        free?: unknown;
+        available?: unknown;
+        buffcache?: unknown;
+      };
     };
     array?: {
       state?: unknown;
@@ -235,12 +249,26 @@ export function mapOverview(data: unknown): OverviewResponse {
   const cpuPercent = Math.round(
     toNumber(metrics.cpu?.percentTotal, toNumber(info.cpuUsage)),
   );
-  const memoryPercent = Math.round(
-    toNumber(metrics.memory?.percentTotal, toNumber(info.memoryUsage)),
+  const reportedMemoryPercent = toNumber(
+    metrics.memory?.percentTotal,
+    toNumber(info.memoryUsage, Number.NaN),
   );
-  const memoryUsed = toBigNumber(metrics.memory?.used, toBigNumber(info.memoryUsed));
+  const memoryUsedRaw = toBigNumber(metrics.memory?.used, toBigNumber(info.memoryUsed));
   const memoryTotal = toBigNumber(metrics.memory?.total, toBigNumber(info.memoryTotal));
+  const memoryAvailable = toBigNumber(metrics.memory?.available, Number.NaN);
+  const memoryCache = toBigNumber(metrics.memory?.buffcache, Number.NaN);
   const memoryFree = toBigNumber(metrics.memory?.free);
+  const memoryUsed =
+    memoryTotal > 0 && Number.isFinite(memoryAvailable)
+      ? Math.max(0, memoryTotal - memoryAvailable)
+      : memoryUsedRaw;
+  const memoryPercentFromUsed = memoryTotal > 0 ? (memoryUsed / memoryTotal) * 100 : 0;
+  const memoryPercent = Math.round(
+    Math.min(
+      100,
+      Math.max(0, Number.isFinite(reportedMemoryPercent) ? reportedMemoryPercent : memoryPercentFromUsed),
+    ),
+  );
   const arrayUsedKb = toBigNumber(capacity.used);
   const arrayFreeKb = toBigNumber(capacity.free);
   const arrayTotalKb = toBigNumber(capacity.total);
@@ -255,6 +283,8 @@ export function mapOverview(data: unknown): OverviewResponse {
     memoryPercent,
     memoryUsed: memoryUsed > 0 ? formatBytes(memoryUsed) : "-",
     memoryTotal: memoryTotal > 0 ? formatBytes(memoryTotal) : "-",
+    memoryAvailable: Number.isFinite(memoryAvailable) && memoryAvailable > 0 ? formatBytes(memoryAvailable) : "-",
+    memoryCache: Number.isFinite(memoryCache) && memoryCache > 0 ? formatBytes(memoryCache) : "-",
     memoryFree: memoryFree > 0 ? formatBytes(memoryFree) : "-",
     serverName: toStringValue(core.vars?.name, toStringValue(record.vars?.name, "Unraid")),
     licenseType: formatLicenseType(core.vars?.regTy ?? record.vars?.regTy),
@@ -401,19 +431,15 @@ export function mapDocker(data: unknown): DockerResponse {
       ports: portSummary ? (hasMorePorts ? `${portSummary}...` : portSummary) : "-",
       createdAt: formatEpochSeconds(item.created),
       autoStart: Boolean(item.autoStart),
-      updateAvailable: Boolean(item.isUpdateAvailable),
-      rebuildReady: Boolean(item.isRebuildReady),
       stateLabel,
       status,
     };
   });
   const running = containers.filter((item) => item.status === "running").length;
-  const updatesAvailable = containers.filter((item) => item.updateAvailable || item.rebuildReady).length;
   return {
     summary: {
       running,
       stopped: Math.max(0, containers.length - running),
-      updatesAvailable,
     },
     containers,
   };

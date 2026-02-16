@@ -295,7 +295,7 @@ export async function fetchOverview(): Promise<OverviewResponse> {
   let core: unknown;
   try {
     core = await gqlRequest<unknown>(
-      "query OverviewCore { vars { name version regTy } info { time cpu { brand cores threads speed } os { distro platform kernel hostname uptime } baseboard { manufacturer model } } metrics { cpu { percentTotal } memory { percentTotal used total free } } array { state capacity { kilobytes { used free total } } parityCheckStatus { date duration speed status progress errors running } } }",
+      "query OverviewCore { vars { name version regTy } info { time cpu { brand cores threads speed } os { distro platform kernel hostname uptime } baseboard { manufacturer model } } metrics { cpu { percentTotal } memory { percentTotal used total free available buffcache } } array { state capacity { kilobytes { used free total } } parityCheckStatus { date duration speed status progress errors running } } }",
     );
   } catch {
     core = await gqlRequest<unknown>(

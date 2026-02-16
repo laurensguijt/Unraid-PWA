@@ -2,6 +2,26 @@
 
 Self-hostable, mobile-first web app to monitor and control Unraid via the GraphQL API.
 
+## App Icon
+
+<p align="center">
+  <img src="frontend/public/icon.svg" alt="Unraid PWA icon" width="128" />
+</p>
+
+## Screenshots
+
+| Dashboard | Storage |
+| --- | --- |
+| ![Dashboard screenshot](screenshots/dashboard-mobile.png) | ![Storage screenshot](screenshots/storage-mobile.png) |
+
+| Shares | Docker |
+| --- | --- |
+| ![Shares screenshot](screenshots/shares-mobile.png) | ![Docker screenshot](screenshots/docker-mobile.png) |
+
+| VM |
+| --- |
+| ![VM screenshot](screenshots/vm-mobile.png) |
+
 ## Install On Unraid (Terminal)
 
 > This app is **not yet in Community Applications**. Install it manually with Docker Compose.
