@@ -1,4 +1,4 @@
-const SHELL_CACHE = "unraid-pwa-shell-v5";
+const SHELL_CACHE = "unraid-pwa-shell-v6";
 const DATA_CACHE = "unraid-pwa-data-v4";
 const SHELL_ASSETS = ["/", "/index.html", "/manifest.webmanifest", "/icon.svg"];
 

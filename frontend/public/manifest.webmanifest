@@ -3,6 +3,7 @@
   "short_name": "Unraid PWA",
   "start_url": "/",
   "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
   "background_color": "#120f1a",
   "theme_color": "#1f172a",
   "icons": [
