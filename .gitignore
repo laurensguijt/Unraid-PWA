@@ -14,13 +14,17 @@ backend/dist
 # Runtime data (never commit)
 backend/data/*
 !backend/data/.gitkeep
+data/*
+!data/.gitkeep
 
 # IDE and OS
 .DS_Store
 *.swp
 *.swo
 .idea
+.cursor
 .vscode/settings.json
+*.code-workspace
 
 # Test and E2E
 frontend/test-results/

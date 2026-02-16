@@ -1,3 +1,5 @@
+import http, { type IncomingHttpHeaders } from "node:http";
+import https from "node:https";
 import { loadServer } from "./secretStore.js";
 import type {
   ArrayResponse,
@@ -9,6 +11,7 @@ import type {
 import { mapArray, mapDocker, mapOverview, mapVms } from "./mappers.js";
 
 type GqlPayload<T> = { data?: T; errors?: Array<{ message: string }> };
+type RawResponse = { statusCode: number; headers: IncomingHttpHeaders; body: Buffer };
 
 /**
  * Unraid API uses AuthAction: CREATE_ANY, READ_ANY, UPDATE_ANY, DELETE_ANY (and _OWN variants).
@@ -27,6 +30,9 @@ const SATISFIES_READ: Record<string, string[]> = {
 const IMPLIES_FULL_READ = ["read:monitoring", "monitoring", "info", "read_any", "read_own"];
 /** Unraid write = create/update/delete actions (AuthAction). Also accept legacy "write" and "admin". */
 const UNRAID_WRITE_ACTIONS = ["create_any", "create_own", "update_any", "update_own", "delete_any", "delete_own"];
+const REQUEST_TIMEOUT_MS = 15_000;
+const strictHttpsAgent = new https.Agent({ keepAlive: true, rejectUnauthorized: true });
+const insecureHttpsAgent = new https.Agent({ keepAlive: true, rejectUnauthorized: false });
 
 function shouldAllowSelfSigned(trustSelfSigned: boolean | undefined): boolean {
   if (typeof trustSelfSigned === "boolean") {
@@ -35,21 +41,64 @@ function shouldAllowSelfSigned(trustSelfSigned: boolean | undefined): boolean {
   return (process.env.UNRAID_BFF_ALLOW_SELF_SIGNED ?? "true") === "true";
 }
 
-async function withTlsVerification<T>(
-  trustSelfSigned: boolean | undefined,
-  run: () => Promise<T>,
-): Promise<T> {
-  const previousTlsSetting = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = shouldAllowSelfSigned(trustSelfSigned) ? "0" : "1";
-  try {
-    return await run();
-  } finally {
-    if (previousTlsSetting === undefined) {
-      delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;
-    } else {
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = previousTlsSetting;
-    }
+function readHeader(headers: IncomingHttpHeaders, headerName: string): string | null {
+  const value = headers[headerName.toLowerCase()];
+  if (Array.isArray(value)) {
+    return value.join(",");
   }
+  return typeof value === "string" ? value : null;
+}
+
+function requestRaw(input: {
+  url: string;
+  method: "GET" | "POST";
+  trustSelfSigned: boolean | undefined;
+  headers?: Record<string, string>;
+  body?: string;
+}): Promise<RawResponse> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(input.url);
+    const isHttps = parsed.protocol === "https:";
+    const transport = isHttps ? https : http;
+    const request = transport.request(
+      {
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        port: parsed.port || undefined,
+        path: `${parsed.pathname}${parsed.search}`,
+        method: input.method,
+        headers: input.headers,
+        agent: isHttps
+          ? shouldAllowSelfSigned(input.trustSelfSigned)
+            ? insecureHttpsAgent
+            : strictHttpsAgent
+          : undefined,
+      },
+      (response) => {
+        const chunks: Buffer[] = [];
+        response.on("data", (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+        });
+        response.on("end", () => {
+          resolve({
+            statusCode: response.statusCode ?? 0,
+            headers: response.headers,
+            body: Buffer.concat(chunks),
+          });
+        });
+      },
+    );
+
+    request.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      request.destroy(new Error("Request timeout"));
+    });
+    request.on("error", reject);
+
+    if (input.body) {
+      request.write(input.body);
+    }
+    request.end();
+  });
 }
 
 async function requestGraphql<T>(
@@ -58,29 +107,37 @@ async function requestGraphql<T>(
   trustSelfSigned: boolean | undefined,
   query: string,
   variables: Record<string, unknown> = {},
-): Promise<{ data: T; headers: Headers }> {
-  let response: Response;
+): Promise<{ data: T; headers: IncomingHttpHeaders }> {
+  let response: RawResponse;
   try {
-    response = await withTlsVerification(trustSelfSigned, async () =>
-      fetch(`${baseUrl.replace(/\/$/, "")}/graphql`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-api-key": apiKey,
-        },
-        body: JSON.stringify({ query, variables }),
-      }),
-    );
+    response = await requestRaw({
+      url: `${baseUrl.replace(/\/$/, "")}/graphql`,
+      method: "POST",
+      trustSelfSigned,
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": apiKey,
+      },
+      body: JSON.stringify({ query, variables }),
+    });
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "Unknown fetch error";
+    const reason = error instanceof Error ? error.message : "Unknown request error";
     throw new Error(`Unable to reach Unraid GraphQL endpoint: ${reason}`);
   }
 
-  const payload = (await response.json().catch(() => ({}))) as GqlPayload<T>;
-  if (!response.ok) {
+  const payload = (() => {
+    try {
+      return JSON.parse(response.body.toString("utf8") || "{}") as GqlPayload<T>;
+    } catch {
+      return {} as GqlPayload<T>;
+    }
+  })();
+  if (response.statusCode < 200 || response.statusCode >= 300) {
     const detail = payload.errors?.map((item) => item.message).filter(Boolean).join(" | ");
     throw new Error(
-      detail ? `Unraid request failed: ${response.status} (${detail})` : `Unraid request failed: ${response.status}`,
+      detail
+        ? `Unraid request failed: ${response.statusCode} (${detail})`
+        : `Unraid request failed: ${response.statusCode}`,
     );
   }
   if (payload.errors?.length) {
@@ -100,22 +157,22 @@ async function requestBinary(
   url: string,
 ): Promise<{ data: Buffer; contentType: string } | null> {
   try {
-    const response = await withTlsVerification(trustSelfSigned, async () =>
-      fetch(url, {
-        headers: {
-          "x-api-key": apiKey,
-        },
-      }),
-    );
-    if (!response.ok) {
+    const response = await requestRaw({
+      url,
+      method: "GET",
+      trustSelfSigned,
+      headers: {
+        "x-api-key": apiKey,
+      },
+    });
+    if (response.statusCode < 200 || response.statusCode >= 300) {
       return null;
     }
-    const contentType = response.headers.get("content-type") ?? "application/octet-stream";
+    const contentType = readHeader(response.headers, "content-type") ?? "application/octet-stream";
     if (!contentType.toLowerCase().startsWith("image/")) {
       return null;
     }
-    const bytes = await response.arrayBuffer();
-    return { data: Buffer.from(bytes), contentType };
+    return { data: response.body, contentType };
   } catch {
     return null;
   }
@@ -136,11 +193,11 @@ async function gqlRequest<T>(query: string, variables: Record<string, unknown> =
   return data;
 }
 
-function readScopesFromHeaders(headers: Headers): string[] {
+function readScopesFromHeaders(headers: IncomingHttpHeaders): string[] {
   const headerValue =
-    headers.get("x-unraid-scopes") ??
-    headers.get("x-api-scopes") ??
-    headers.get("x-scopes");
+    readHeader(headers, "x-unraid-scopes") ??
+    readHeader(headers, "x-api-scopes") ??
+    readHeader(headers, "x-scopes");
   if (!headerValue) {
     return [];
   }

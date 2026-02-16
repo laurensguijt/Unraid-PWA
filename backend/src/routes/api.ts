@@ -28,7 +28,15 @@ import {
   runVmAction,
   testConnection,
 } from "../services/unraidClient.js";
-import type { SetupPayload } from "../types/api.js";
+import {
+  parseAppSettingsUpdateBody,
+  parseResourceId,
+  parseServerConnectionTestBody,
+  parseServerCreateBody,
+  parseServerApiKeyBody,
+  parseServerId,
+  parseServerUpdateBody,
+} from "./requestValidation.js";
 
 export const apiRouter = Router();
 
@@ -51,6 +59,21 @@ function respondBadRequest(res: Response, error: string): void {
   res.status(400).json({ error });
 }
 
+function normalizeBaseUrl(raw: string): string | null {
+  try {
+    const parsed = new URL(raw.trim());
+    if ((parsed.protocol !== "http:" && parsed.protocol !== "https:") || !parsed.hostname) {
+      return null;
+    }
+    if (parsed.username || parsed.password) {
+      return null;
+    }
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return null;
+  }
+}
+
 async function runAuditedAction(input: {
   action: string;
   target: string;
@@ -66,14 +89,21 @@ async function runAuditedAction(input: {
 }
 
 apiRouter.post("/servers/test", async (req, res) => {
-  const { baseUrl, apiKey, trustSelfSigned } = req.body as SetupPayload;
-  if (!baseUrl || !apiKey) {
-    respondBadRequest(res, "baseUrl and apiKey are required");
+  const parsedBody = parseServerConnectionTestBody(req.body);
+  if (!parsedBody.ok) {
+    respondBadRequest(res, parsedBody.error);
+    return;
+  }
+  const { baseUrl, apiKey, trustSelfSigned } = parsedBody.value;
+
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  if (!normalizedBaseUrl) {
+    respondBadRequest(res, "baseUrl must be a valid http(s) URL");
     return;
   }
 
   try {
-    const result = await testConnection(baseUrl, apiKey, trustSelfSigned);
+    const result = await testConnection(normalizedBaseUrl, apiKey, trustSelfSigned);
     res.json(result);
   } catch (error) {
     res.status(502).json({
@@ -83,10 +113,17 @@ apiRouter.post("/servers/test", async (req, res) => {
   }
 });
 
-apiRouter.post("/servers", requireCsrf, async (req, res) => {
-  const { baseUrl, apiKey, requestedScopes = [], name, trustSelfSigned = true } = req.body as SetupPayload;
-  if (!baseUrl || !apiKey) {
-    respondBadRequest(res, "baseUrl and apiKey are required");
+apiRouter.post("/servers", requireCsrf, writeRateLimit, async (req, res) => {
+  const parsedBody = parseServerCreateBody(req.body);
+  if (!parsedBody.ok) {
+    respondBadRequest(res, parsedBody.error);
+    return;
+  }
+  const { baseUrl, apiKey, requestedScopes, name, accentColor, trustSelfSigned } = parsedBody.value;
+
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  if (!normalizedBaseUrl) {
+    respondBadRequest(res, "baseUrl must be a valid http(s) URL");
     return;
   }
 
@@ -94,10 +131,11 @@ apiRouter.post("/servers", requireCsrf, async (req, res) => {
     const resolvedName =
       typeof name === "string" && name.trim()
         ? name.trim()
-        : (await resolveServerName(baseUrl, apiKey, trustSelfSigned)) ?? undefined;
+        : (await resolveServerName(normalizedBaseUrl, apiKey, trustSelfSigned)) ?? undefined;
     const server = await saveServer({
       name: resolvedName,
-      baseUrl,
+      accentColor,
+      baseUrl: normalizedBaseUrl,
       apiKey,
       trustSelfSigned,
       scopes: requestedScopes,
@@ -114,86 +152,165 @@ apiRouter.post("/servers", requireCsrf, async (req, res) => {
 });
 
 apiRouter.get("/servers", async (_req, res) => {
-  const data = await listServers();
-  res.json({
-    activeServerId: data.activeServerId,
-    servers: data.servers.map((server) => ({
-      id: server.id,
-      name: server.name,
-      baseUrl: server.baseUrl,
-      trustSelfSigned: server.trustSelfSigned,
-      scopes: server.scopes,
-      createdAt: server.createdAt,
-    })),
-  });
+  try {
+    const data = await listServers();
+    res.json({
+      activeServerId: data.activeServerId,
+      servers: data.servers.map((server) => ({
+        id: server.id,
+        name: server.name,
+        accentColor: server.accentColor,
+        baseUrl: server.baseUrl,
+        trustSelfSigned: server.trustSelfSigned,
+        scopes: server.scopes,
+        createdAt: server.createdAt,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to list servers", detail: toErrorDetail(error) });
+  }
 });
 
-apiRouter.put("/servers/:id", requireCsrf, async (req, res) => {
-  const serverId = req.params.id;
-  const { name, trustSelfSigned } = req.body as { name?: string; trustSelfSigned?: boolean };
+apiRouter.put("/servers/:id", requireCsrf, writeRateLimit, async (req, res) => {
+  try {
+    const parsedServerId = parseServerId(req.params.id);
+    if (!parsedServerId.ok) {
+      respondBadRequest(res, parsedServerId.error);
+      return;
+    }
+    const serverId = parsedServerId.value;
 
-  if (name === undefined && trustSelfSigned === undefined) {
-    respondBadRequest(res, "name or trustSelfSigned is required");
+    const parsedBody = parseServerUpdateBody(req.body);
+    if (!parsedBody.ok) {
+      respondBadRequest(res, parsedBody.error);
+      return;
+    }
+    const { name, trustSelfSigned, accentColor, apiKey } = parsedBody.value;
+
+    let nextName = name;
+    if (typeof name === "string" && name.trim().length === 0) {
+      const server = await loadServerById(serverId);
+      if (!server) {
+        res.status(404).json({ error: "Server not found" });
+        return;
+      }
+      nextName =
+        (await resolveServerName(server.baseUrl, server.apiKey, server.trustSelfSigned)) ??
+        server.name;
+    }
+
+    const ok = await updateServer(serverId, {
+      name: nextName,
+      trustSelfSigned,
+      accentColor,
+      apiKey,
+    });
+    if (!ok) {
+      res.status(404).json({ error: "Server not found" });
+      return;
+    }
+
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to update server", detail: toErrorDetail(error) });
+  }
+});
+
+apiRouter.post("/servers/:id/test-key", requireCsrf, writeRateLimit, async (req, res) => {
+  const parsedServerId = parseServerId(req.params.id);
+  if (!parsedServerId.ok) {
+    respondBadRequest(res, parsedServerId.error);
     return;
   }
 
-  let nextName = name;
-  if (typeof name === "string" && name.trim().length === 0) {
-    const server = await loadServerById(serverId);
+  const parsedBody = parseServerApiKeyBody(req.body);
+  if (!parsedBody.ok) {
+    respondBadRequest(res, parsedBody.error);
+    return;
+  }
+
+  try {
+    const server = await loadServerById(parsedServerId.value);
     if (!server) {
       res.status(404).json({ error: "Server not found" });
       return;
     }
-    nextName =
-      (await resolveServerName(server.baseUrl, server.apiKey, server.trustSelfSigned)) ??
-      server.name;
-  }
 
-  const ok = await updateServer(serverId, { name: nextName, trustSelfSigned });
-  if (!ok) {
-    res.status(404).json({ error: "Server not found" });
-    return;
+    const result = await testConnection(
+      server.baseUrl,
+      parsedBody.value.apiKey,
+      server.trustSelfSigned,
+    );
+    res.json(result);
+  } catch (error) {
+    res.status(502).json({
+      error: "API key test failed",
+      detail: toErrorDetail(error),
+    });
   }
-
-  res.json({ ok: true });
 });
 
-apiRouter.post("/servers/:id/activate", requireCsrf, async (req, res) => {
-  const serverId = req.params.id;
-  const ok = await setActiveServer(serverId);
-  if (!ok) {
-    res.status(404).json({ error: "Server not found" });
-    return;
+apiRouter.post("/servers/:id/activate", requireCsrf, writeRateLimit, async (req, res) => {
+  try {
+    const parsedServerId = parseServerId(req.params.id);
+    if (!parsedServerId.ok) {
+      respondBadRequest(res, parsedServerId.error);
+      return;
+    }
+    const serverId = parsedServerId.value;
+
+    const ok = await setActiveServer(serverId);
+    if (!ok) {
+      res.status(404).json({ error: "Server not found" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to activate server", detail: toErrorDetail(error) });
   }
-  res.json({ ok: true });
 });
 
-apiRouter.delete("/servers/:id", requireCsrf, async (req, res) => {
-  const serverId = req.params.id;
-  const ok = await deleteServer(serverId);
-  if (!ok) {
-    res.status(404).json({ error: "Server not found" });
-    return;
+apiRouter.delete("/servers/:id", requireCsrf, writeRateLimit, async (req, res) => {
+  try {
+    const parsedServerId = parseServerId(req.params.id);
+    if (!parsedServerId.ok) {
+      respondBadRequest(res, parsedServerId.error);
+      return;
+    }
+    const serverId = parsedServerId.value;
+
+    const ok = await deleteServer(serverId);
+    if (!ok) {
+      res.status(404).json({ error: "Server not found" });
+      return;
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to remove server", detail: toErrorDetail(error) });
   }
-  res.json({ ok: true });
 });
 
 apiRouter.get("/servers/status", async (_req, res) => {
-  const server = await loadServer();
-  if (!server) {
-    res.json({ configured: false });
-    return;
+  try {
+    const server = await loadServer();
+    if (!server) {
+      res.json({ configured: false });
+      return;
+    }
+    res.json({
+      configured: true,
+      id: server.id,
+      name: server.name,
+      accentColor: server.accentColor,
+      baseUrl: server.baseUrl,
+      trustSelfSigned: server.trustSelfSigned,
+      scopes: server.scopes,
+      canWrite: hasWriteScopes(server.scopes),
+      createdAt: server.createdAt,
+    });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to load server status", detail: toErrorDetail(error) });
   }
-  res.json({
-    configured: true,
-    id: server.id,
-    name: server.name,
-    baseUrl: server.baseUrl,
-    trustSelfSigned: server.trustSelfSigned,
-    scopes: server.scopes,
-    canWrite: hasWriteScopes(server.scopes),
-    createdAt: server.createdAt,
-  });
 });
 
 apiRouter.get("/overview", async (_req, res) => {
@@ -209,14 +326,27 @@ apiRouter.get("/overview", async (_req, res) => {
 });
 
 apiRouter.get("/settings/app", async (_req, res) => {
-  const settings = await getAppSettings();
-  res.json(settings);
+  try {
+    const settings = await getAppSettings();
+    res.json(settings);
+  } catch (error) {
+    res.status(500).json({ error: "Unable to load app settings", detail: toErrorDetail(error) });
+  }
 });
 
-apiRouter.put("/settings/app", requireCsrf, async (req, res) => {
-  const payload = req.body as { themeMode?: "dark" | "light"; accentColor?: string };
-  const next = await updateAppSettings(payload);
-  res.json(next);
+apiRouter.put("/settings/app", requireCsrf, writeRateLimit, async (req, res) => {
+  try {
+    const parsedBody = parseAppSettingsUpdateBody(req.body);
+    if (!parsedBody.ok) {
+      respondBadRequest(res, parsedBody.error);
+      return;
+    }
+
+    const next = await updateAppSettings(parsedBody.value);
+    res.json(next);
+  } catch (error) {
+    res.status(500).json({ error: "Unable to save app settings", detail: toErrorDetail(error) });
+  }
 });
 
 apiRouter.get("/array", async (_req, res) => {
@@ -287,11 +417,12 @@ apiRouter.post(
   requireCsrf,
   writeRateLimit,
   async (req, res) => {
-    const notificationId = req.params.id;
-    if (!notificationId) {
-      respondBadRequest(res, "Missing notification id");
+    const parsedNotificationId = parseResourceId(req.params.id, "Notification id");
+    if (!parsedNotificationId.ok) {
+      respondBadRequest(res, parsedNotificationId.error);
       return;
     }
+    const notificationId = parsedNotificationId.value;
 
     try {
       await runAuditedAction({
@@ -319,12 +450,18 @@ apiRouter.post(
       respondBadRequest(res, "Unsupported action");
       return;
     }
+    const parsedId = parseResourceId(req.params.id, "Container id");
+    if (!parsedId.ok) {
+      respondBadRequest(res, parsedId.error);
+      return;
+    }
+    const containerId = parsedId.value;
 
     try {
       await runAuditedAction({
         action,
-        target: req.params.id,
-        run: () => runContainerAction(req.params.id, action),
+        target: containerId,
+        run: () => runContainerAction(containerId, action),
       });
       res.json({ ok: true });
     } catch (error) {
@@ -346,12 +483,18 @@ apiRouter.post(
       respondBadRequest(res, "Unsupported action");
       return;
     }
+    const parsedId = parseResourceId(req.params.id, "VM id");
+    if (!parsedId.ok) {
+      respondBadRequest(res, parsedId.error);
+      return;
+    }
+    const vmId = parsedId.value;
 
     try {
       await runAuditedAction({
         action: `vm:${action}`,
-        target: req.params.id,
-        run: () => runVmAction(req.params.id, action),
+        target: vmId,
+        run: () => runVmAction(vmId, action),
       });
       res.json({ ok: true });
     } catch (error) {

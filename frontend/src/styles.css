@@ -79,6 +79,7 @@ body {
   gap: 0.35rem;
   margin-bottom: 0.75rem;
   min-height: 48px;
+  z-index: 80;
 }
 
 .header h1 {
@@ -136,14 +137,141 @@ body {
   align-items: center;
   gap: 0.45rem;
   justify-content: flex-end;
+  z-index: 90;
 }
 
-.server-switcher {
-  width: auto;
-  max-width: 140px;
-  padding: 0.4rem 0.5rem;
+.server-switcher-popover {
+  position: relative;
+  z-index: 100;
+}
+
+button.server-switcher-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 40px;
+  max-width: 170px;
+  padding: 0.46rem 0.62rem;
+  border-radius: 14px;
+  border: 1px solid #ffffff33;
+  background: #0f172a99;
+  color: #f8fafc;
   font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: none;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+
+button.server-switcher-trigger:hover {
+  background: #0f172ac4;
+}
+
+.server-switcher-label {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.server-switcher-dot {
+  width: 0.56rem;
+  height: 0.56rem;
+  border-radius: 999px;
+  display: inline-block;
+  box-shadow: 0 0 0 1px #ffffff70;
+  flex-shrink: 0;
+}
+
+.server-switcher-menu {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  width: min(240px, 76vw);
+  padding: 0.34rem;
+  border-radius: 14px;
+  border: 1px solid #ffffff2e;
+  background: #0f172af2;
+  box-shadow: 0 18px 36px #00000066;
+  backdrop-filter: blur(14px) saturate(130%);
+  z-index: 110;
+  display: grid;
+  gap: 0.24rem;
+}
+
+.server-switcher-menu-portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: auto;
+  z-index: 1400;
+}
+
+button.server-switcher-item {
+  width: 100%;
   border-radius: 10px;
+  border: 1px solid transparent;
+  padding: 0.42rem 0.54rem;
+  background: transparent;
+  color: #f8fafc;
+  text-transform: none;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  justify-content: flex-start;
+}
+
+button.server-switcher-item:hover {
+  background: #ffffff18;
+}
+
+button.server-switcher-item.active {
+  border-color: #ffffff2f;
+  background: #ffffff1f;
+}
+
+.server-switcher-item-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 1;
+  text-align: left;
+}
+
+.server-switcher-check {
+  color: #4ade80;
+  flex-shrink: 0;
+}
+
+.app.theme-light button.server-switcher-trigger {
+  border-color: #33415545;
+  background: #ffffffd4;
+  color: #0f172a;
+}
+
+.app.theme-light button.server-switcher-trigger:hover {
+  background: #ffffff;
+}
+
+.app.theme-light .server-switcher-menu {
+  border-color: #33415534;
+  background: #f8fafcf4;
+  box-shadow: 0 16px 34px #33415526;
+}
+
+.app.theme-light button.server-switcher-item {
+  color: #0f172a;
+}
+
+.app.theme-light button.server-switcher-item:hover {
+  background: #3341551a;
+}
+
+.app.theme-light button.server-switcher-item.active {
+  border-color: #33415534;
+  background: #33415522;
 }
 
 .circle-button {
@@ -346,6 +474,20 @@ body {
   overflow: hidden;
 }
 
+.progress-with-value {
+  margin: 0.52rem 0 0.62rem;
+}
+
+.progress-value {
+  font-size: 0.78rem;
+  opacity: 0.85;
+  text-align: right;
+}
+
+.progress-with-value .bar {
+  margin: 0.3rem 0 0;
+}
+
 .bar div {
   height: 100%;
   border-radius: inherit;
@@ -438,6 +580,33 @@ label {
 
 .checkbox-label input[type="checkbox"] {
   width: auto;
+}
+
+.server-key-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.3rem;
+  flex-wrap: wrap;
+}
+
+.server-key-control {
+  margin-top: 0;
+  flex: 1;
+  min-width: 180px;
+}
+
+.server-accent-control {
+  margin-top: 0.35rem;
+  width: fit-content;
+}
+
+.server-accent-control input[type="color"] {
+  width: 3.25rem;
+  min-width: 3.25rem;
+  height: 2rem;
+  padding: 0.2rem;
+  border-radius: 10px;
 }
 
 input {

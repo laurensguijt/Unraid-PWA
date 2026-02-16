@@ -1,4 +1,4 @@
-export type Tab = "overview" | "array" | "shares" | "docker" | "vms" | "settings";
+export type Tab = "overview" | "array" | "shares" | "docker" | "vms";
 
 export type Overview = {
   cpuPercent: number;
@@ -154,6 +154,7 @@ export type SharesData = {
 export type ServerRecord = {
   id: string;
   name: string;
+  accentColor: string;
   baseUrl: string;
   trustSelfSigned: boolean;
   createdAt: string;

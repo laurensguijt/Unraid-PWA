@@ -9,6 +9,7 @@ COPY frontend/vite.config.ts ./vite.config.ts
 COPY frontend/index.html ./index.html
 COPY frontend/public ./public
 COPY frontend/src ./src
+COPY scripts /scripts
 RUN npm run build
 
 FROM node:22-alpine AS backend-build

@@ -2,6 +2,7 @@ export type SetupPayload = {
   baseUrl: string;
   apiKey: string;
   name?: string;
+  accentColor?: string;
   requestedScopes?: string[];
   trustSelfSigned?: boolean;
 };

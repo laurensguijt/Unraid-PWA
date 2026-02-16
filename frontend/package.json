@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node ./node_modules/vite/bin/vite.js",
-    "build": "node ./node_modules/typescript/bin/tsc --noEmit && node ./node_modules/vite/bin/vite.js build",
-    "preview": "node ./node_modules/vite/bin/vite.js preview",
+    "dev": "node ../scripts/with-esbuild-binary.mjs . node ./node_modules/vite/bin/vite.js",
+    "build": "node ./node_modules/typescript/bin/tsc --noEmit && node ../scripts/with-esbuild-binary.mjs . node ./node_modules/vite/bin/vite.js build",
+    "preview": "node ../scripts/with-esbuild-binary.mjs . node ./node_modules/vite/bin/vite.js preview",
     "lint": "node ./node_modules/typescript/bin/tsc --noEmit",
     "test:e2e": "node ./node_modules/@playwright/test/cli.js test"
   },

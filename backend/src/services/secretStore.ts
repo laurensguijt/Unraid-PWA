@@ -1,10 +1,12 @@
 import crypto from "node:crypto";
+import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 
 export type StoredServer = {
   id: string;
   name: string;
+  accentColor: string;
   baseUrl: string;
   apiKey: string;
   trustSelfSigned: boolean;
@@ -26,23 +28,80 @@ type ServerStore = {
 const dataDir = path.resolve(process.cwd(), "data");
 const dataFile = path.resolve(dataDir, "servers.enc");
 const legacyDataFile = path.resolve(dataDir, "server.enc");
-const fallbackEncryptionKey = "unraid-pwa-insecure-dev-key";
+const keyFile = path.resolve(dataDir, "encryption.key");
+const DEFAULT_ACCENT_COLOR = "#ea580c";
+const legacyFallbackEncryptionKey = "unraid-pwa-insecure-dev-key";
 let didWarnForWeakEncryptionKey = false;
+let didWarnForLegacyKeyMigration = false;
 
-function getKeyMaterial(): Buffer {
-  const raw = (process.env.UNRAID_BFF_ENCRYPTION_KEY ?? "").trim();
-  const weak =
+function isWeakKey(raw: string): boolean {
+  return (
     raw.length < 16 ||
     raw.startsWith("replace-with-") ||
-    raw === "replace-with-32-char-key-material";
-  if (weak && !didWarnForWeakEncryptionKey) {
+    raw === "replace-with-32-char-key-material"
+  );
+}
+
+function readKeyFile(): string | null {
+  try {
+    const value = fsSync.readFileSync(keyFile, "utf8").trim();
+    if (!value) {
+      throw new Error("Encryption key file is empty.");
+    }
+    return value;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+}
+
+function createKeyFile(): string {
+  fsSync.mkdirSync(dataDir, { recursive: true });
+  const generated = crypto.randomBytes(32).toString("hex");
+  try {
+    fsSync.writeFileSync(keyFile, generated, { encoding: "utf8", mode: 0o600, flag: "wx" });
+    return generated;
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") {
+      const existing = readKeyFile();
+      if (existing) {
+        return existing;
+      }
+    }
+    throw error;
+  }
+}
+
+function resolveKeySource(): string {
+  const raw = (process.env.UNRAID_BFF_ENCRYPTION_KEY ?? "").trim();
+  if (!isWeakKey(raw)) {
+    return raw;
+  }
+
+  if (!didWarnForWeakEncryptionKey) {
     didWarnForWeakEncryptionKey = true;
     console.warn(
-      "UNRAID_BFF_ENCRYPTION_KEY is missing or weak. Using an insecure fallback key for local development.",
+      "UNRAID_BFF_ENCRYPTION_KEY is missing or weak. Falling back to data/encryption.key (auto-generated).",
     );
   }
-  const source = weak ? fallbackEncryptionKey : raw;
+
+  const existing = readKeyFile();
+  if (existing) {
+    return existing;
+  }
+  return createKeyFile();
+}
+
+function deriveKeyMaterial(source: string): Buffer {
   return crypto.createHash("sha256").update(source).digest();
+}
+
+function getKeyMaterial(): Buffer {
+  return deriveKeyMaterial(resolveKeySource());
 }
 
 function encrypt(value: string): string {
@@ -53,11 +112,14 @@ function encrypt(value: string): string {
   return `${iv.toString("hex")}.${tag.toString("hex")}.${encrypted.toString("hex")}`;
 }
 
-function decrypt(value: string): string {
-  const [ivHex, tagHex, dataHex] = value.split(".");
+function decryptWithKeyMaterial(value: string, keyMaterial: Buffer): string {
+  const [ivHex, tagHex, dataHex, ...rest] = value.split(".");
+  if (rest.length > 0 || !ivHex || !tagHex || !dataHex) {
+    throw new Error("Encrypted payload format is invalid.");
+  }
   const decipher = crypto.createDecipheriv(
     "aes-256-gcm",
-    getKeyMaterial(),
+    keyMaterial,
     Buffer.from(ivHex, "hex"),
   );
   decipher.setAuthTag(Buffer.from(tagHex, "hex"));
@@ -68,13 +130,41 @@ function decrypt(value: string): string {
   return decrypted.toString("utf8");
 }
 
+function decrypt(value: string): { value: string; usedLegacyFallback: boolean } {
+  try {
+    return {
+      value: decryptWithKeyMaterial(value, getKeyMaterial()),
+      usedLegacyFallback: false,
+    };
+  } catch (primaryError) {
+    try {
+      const legacy = decryptWithKeyMaterial(
+        value,
+        deriveKeyMaterial(legacyFallbackEncryptionKey),
+      );
+      if (!didWarnForLegacyKeyMigration) {
+        didWarnForLegacyKeyMigration = true;
+        console.warn(
+          "Detected credentials encrypted with a legacy fallback key. Re-encrypting with current key material.",
+        );
+      }
+      return {
+        value: legacy,
+        usedLegacyFallback: true,
+      };
+    } catch {
+      throw primaryError;
+    }
+  }
+}
+
 function defaultStore(): ServerStore {
   return {
     activeServerId: null,
     servers: [],
     appSettings: {
       themeMode: "dark",
-      accentColor: "#ea580c", /* default: orange */
+      accentColor: DEFAULT_ACCENT_COLOR, /* default: orange */
     },
   };
 }
@@ -89,13 +179,13 @@ function normalizeThemeMode(value: unknown): "dark" | "light" {
 function normalizeAccentColor(value: unknown): string {
   const legacyMap: Record<string, string> = {
     amber: "#d97706",
-    orange: "#ea580c",
+    orange: DEFAULT_ACCENT_COLOR,
     purple: "#9333ea",
     blue: "#3b82f6",
     green: "#22c55e",
   };
   if (typeof value !== "string") {
-    return "#ea580c";
+    return DEFAULT_ACCENT_COLOR;
   }
   const trimmed = value.trim().toLowerCase();
   if (legacyMap[trimmed]) {
@@ -109,7 +199,7 @@ function normalizeAccentColor(value: unknown): string {
   if (/^#([0-9a-f]{6})$/i.test(trimmed)) {
     return trimmed;
   }
-  return "#ea580c";
+  return DEFAULT_ACCENT_COLOR;
 }
 
 function normalizeLegacy(payload: unknown): ServerStore {
@@ -142,6 +232,7 @@ function normalizeLegacy(payload: unknown): ServerStore {
         {
           id,
           name: "Primary server",
+          accentColor: DEFAULT_ACCENT_COLOR,
           baseUrl: legacy.baseUrl,
           apiKey: legacy.apiKey,
           trustSelfSigned: true,
@@ -155,13 +246,14 @@ function normalizeLegacy(payload: unknown): ServerStore {
   return defaultStore();
 }
 
-function normalizeStoredServer(server: StoredServer, index: number): StoredServer {
+function normalizeStoredServer(server: Partial<StoredServer>, index: number): StoredServer {
   return {
     id: typeof server.id === "string" && server.id.trim() ? server.id : crypto.randomUUID(),
     name:
       typeof server.name === "string" && server.name.trim()
         ? server.name.trim()
         : `Server ${index + 1}`,
+    accentColor: normalizeAccentColor(server.accentColor),
     baseUrl: typeof server.baseUrl === "string" ? server.baseUrl : "",
     apiKey: typeof server.apiKey === "string" ? server.apiKey : "",
     trustSelfSigned: typeof server.trustSelfSigned === "boolean" ? server.trustSelfSigned : true,
@@ -176,17 +268,61 @@ function normalizeStoredServer(server: StoredServer, index: number): StoredServe
 }
 
 async function readStore(): Promise<ServerStore> {
-  try {
-    const content = await fs.readFile(dataFile, "utf8");
-    return normalizeLegacy(JSON.parse(decrypt(content)));
-  } catch {
+  async function readEncryptedStore(
+    filePath: string,
+  ): Promise<{ store: ServerStore; migrated: boolean }> {
+    const content = await fs.readFile(filePath, "utf8");
     try {
-      const legacyContent = await fs.readFile(legacyDataFile, "utf8");
-      return normalizeLegacy(JSON.parse(decrypt(legacyContent)));
-    } catch {
-      return defaultStore();
+      const decrypted = decrypt(content);
+      return {
+        store: normalizeLegacy(JSON.parse(decrypted.value)),
+        migrated: decrypted.usedLegacyFallback,
+      };
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Unknown decryption failure";
+      throw new Error(
+        `Failed to decrypt ${path.basename(filePath)}. Check encryption key consistency. (${reason})`,
+      );
     }
   }
+
+  function isFileMissing(error: unknown): boolean {
+    return (error as NodeJS.ErrnoException)?.code === "ENOENT";
+  }
+
+  let primaryReadError: Error | null = null;
+
+  try {
+    const current = await readEncryptedStore(dataFile);
+    if (current.migrated) {
+      await writeStore(current.store);
+    }
+    return current.store;
+  } catch (error) {
+    if (!isFileMissing(error)) {
+      primaryReadError =
+        error instanceof Error ? error : new Error("Unknown encrypted store read error");
+    }
+  }
+
+  try {
+    const legacy = await readEncryptedStore(legacyDataFile);
+    await writeStore(legacy.store);
+    return legacy.store;
+  } catch (error) {
+    if (!isFileMissing(error)) {
+      if (primaryReadError) {
+        throw primaryReadError;
+      }
+      throw error;
+    }
+  }
+
+  if (primaryReadError) {
+    throw primaryReadError;
+  }
+
+  return defaultStore();
 }
 
 async function writeStore(store: ServerStore): Promise<void> {
@@ -195,7 +331,11 @@ async function writeStore(store: ServerStore): Promise<void> {
 }
 
 export async function saveServer(
-  server: Omit<StoredServer, "id" | "name"> & { id?: string; name?: string },
+  server: Omit<StoredServer, "id" | "name" | "accentColor"> & {
+    id?: string;
+    name?: string;
+    accentColor?: string;
+  },
 ): Promise<StoredServer> {
   const store = await readStore();
   const id = server.id ?? crypto.randomUUID();
@@ -204,6 +344,7 @@ export async function saveServer(
   const next: StoredServer = {
     id,
     name,
+    accentColor: normalizeAccentColor(server.accentColor ?? existing?.accentColor),
     baseUrl: server.baseUrl,
     apiKey: server.apiKey,
     trustSelfSigned: server.trustSelfSigned ?? existing?.trustSelfSigned ?? true,
@@ -243,7 +384,7 @@ export async function listServers(): Promise<{ activeServerId: string | null; se
 
 export async function updateServer(
   serverId: string,
-  input: { name?: string; trustSelfSigned?: boolean },
+  input: { name?: string; trustSelfSigned?: boolean; accentColor?: string; apiKey?: string },
 ): Promise<boolean> {
   const store = await readStore();
   const target = store.servers.find((item) => item.id === serverId);
@@ -255,6 +396,12 @@ export async function updateServer(
   }
   if (typeof input.trustSelfSigned === "boolean") {
     target.trustSelfSigned = input.trustSelfSigned;
+  }
+  if (typeof input.accentColor === "string") {
+    target.accentColor = normalizeAccentColor(input.accentColor);
+  }
+  if (typeof input.apiKey === "string" && input.apiKey.trim()) {
+    target.apiKey = input.apiKey.trim();
   }
   await writeStore(store);
   return true;

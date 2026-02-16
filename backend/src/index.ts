@@ -4,6 +4,7 @@ import cors from "cors";
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { NextFunction, Request, Response } from "express";
 import { ensureCsrfCookie } from "./middleware/csrf.js";
 import { apiRouter } from "./routes/api.js";
 
@@ -14,6 +15,12 @@ const allowedOrigins = (process.env.UNRAID_BFF_ORIGIN ?? "*")
   .map((item) => item.trim())
   .filter(Boolean);
 const allowAnyOrigin = allowedOrigins.includes("*");
+const trustProxyRaw = (process.env.UNRAID_BFF_TRUST_PROXY ?? "false").trim().toLowerCase();
+if (trustProxyRaw === "true") {
+  app.set("trust proxy", 1);
+} else if (["loopback", "linklocal", "uniquelocal"].includes(trustProxyRaw)) {
+  app.set("trust proxy", trustProxyRaw);
+}
 
 app.disable("x-powered-by");
 app.use(
@@ -37,6 +44,16 @@ app.get("/health", (_req, res) => {
 });
 
 app.use("/api", apiRouter);
+app.use((error: unknown, req: Request, res: Response, next: NextFunction) => {
+  if (req.path.startsWith("/api")) {
+    res.status(500).json({
+      error: "Internal server error",
+      detail: error instanceof Error ? error.message : "Unknown error",
+    });
+    return;
+  }
+  next(error);
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
