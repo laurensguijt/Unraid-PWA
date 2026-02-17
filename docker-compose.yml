@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/joshuaseidel/unraid-pwa:latest
+    image: ghcr.io/laurensguijt/unraid-pwa:latest
     # Uncomment the following lines to build locally instead of using pre-built image
     # build:
     #   context: .
