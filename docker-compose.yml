@@ -1,8 +1,10 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/joshuaseidel/unraid-pwa:latest
+    # Uncomment the following lines to build locally instead of using pre-built image
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     container_name: unraid-pwa
     environment:
       UNRAID_BFF_PORT: ${UNRAID_BFF_PORT:-3001}

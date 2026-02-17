@@ -24,7 +24,31 @@ Self-hostable, mobile-first web app to monitor and control Unraid via the GraphQ
 
 > This app is **not yet in Community Applications**. Install it manually with Docker Compose.
 
+### Using Pre-built Image (Recommended)
+
+Pre-built Docker images are automatically published to GitHub Container Registry.
+
 Run these commands on your Unraid server terminal:
+
+```bash
+cd /mnt/user/appdata
+git clone https://github.com/laurensguijt/Unraid-PWA.git
+cd Unraid-PWA
+
+# Optional: customize environment values
+cp .env.example .env
+nano .env
+
+# Start using pre-built image
+docker compose up -d
+
+# Check status
+docker compose ps
+```
+
+### Building From Source
+
+If you prefer to build the image locally:
 
 ```bash
 cd /mnt/user/appdata
