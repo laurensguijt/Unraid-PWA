@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>Unraid-PWA</Name>
+  <Repository>ghcr.io/laurensguijt/unraid-pwa:latest</Repository>
+  <Registry>https://ghcr.io</Registry>
+
+  <Network>bridge</Network>
+
+  <MyIP/>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/laurensguijt/Unraid-PWA/discussions</Support>
+  <Project>https://github.com/laurensguijt/Unraid-PWA</Project>
+  <Overview>
+Open-source, self-hostable PWA to monitor and control Unraid via its GraphQL API.
+Default URL: http://[IP]:[PORT:2442]
+  </Overview>
+  <Category>Tools: System</Category>
+
+  <!-- Gebruik een raw URL naar je icon.svg -->
+  <Icon>https://raw.githubusercontent.com/laurensguijt/Unraid-PWA/main/frontend/public/icon.svg</Icon>
+
+  <WebUI>http://[IP]:[PORT:2442]/</WebUI>
+
+  <Config Name="WebUI Port" Target="3001" Default="2442" Mode="tcp" Description="Host port for the Unraid-PWA web interface." Type="Port" Display="always" Required="true" Mask="false"/>
+
+  <Config Name="App Data" Target="/app/data" Default="/mnt/user/appdata/unraid-pwa" Mode="rw" Description="Persistent data (servers.enc, encryption.key, audit.log)." Type="Path" Display="always" Required="true" Mask="false"/>
+
+  <Config Name="UNRAID_BFF_ALLOW_SELF_SIGNED" Target="UNRAID_BFF_ALLOW_SELF_SIGNED" Default="true" Mode="" Description="Allow self-signed certs for Unraid server connections (true/false)." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <Config Name="UNRAID_BFF_TRUST_PROXY" Target="UNRAID_BFF_TRUST_PROXY" Default="false" Mode="" Description="Set true if you run behind a reverse proxy (or specific proxy mode if supported)." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <Config Name="UNRAID_BFF_ORIGIN" Target="UNRAID_BFF_ORIGIN" Default="http://localhost:2442" Mode="" Description="CORS allowlist. Usually leave default when accessing via http://&lt;UNRAID-IP&gt;:2442." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+
+  <Config Name="UNRAID_BFF_ENCRYPTION_KEY" Target="UNRAID_BFF_ENCRYPTION_KEY" Default="" Mode="" Description="Optional override. If empty, the app generates /app/data/encryption.key." Type="Variable" Display="advanced" Required="false" Mask="true"/>
+</Container>
